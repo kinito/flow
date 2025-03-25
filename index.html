@@ -1,0 +1,96 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Wave Post Generator</title>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; background: #f2f2f2; }
+    canvas { display: block; margin: 1rem auto; border: 1px solid #ccc; }
+    .controls { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 0.5rem; }
+    label { display: flex; justify-content: space-between; align-items: center; }
+    input[type="range"] { width: 100%; }
+  </style>
+</head>
+<body>
+
+  <div class="controls">
+    <label>Static Image <input type="file" id="staticUpload" accept="image/*"></label>
+    <label>Wave Image <input type="file" id="waveUpload" accept="image/*"></label>
+    <label>Wave Strength <input type="range" id="strength" min="0" max="100" value="10"></label>
+    <label>Wave Speed <input type="range" id="speed" min="0.01" max="0.2" step="0.01" value="0.05"></label>
+    <label>Wave Scale <input type="range" id="scale" min="0.001" max="0.05" step="0.001" value="0.015"></label>
+    <button onclick="startRecording()">Start Recording and Download .webm</button>
+  </div>
+
+  <canvas id="defaultCanvas0"></canvas>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ccapture.js/1.1.0/CCapture.all.min.js"></script>
+  <script>
+    let imgStatic, imgWave;
+    let waveStrength = 10, waveSpeed = 0.05, waveScale = 0.015;
+    let capturer, recording = false, recordFrames = 300, frameCountForCapture = 0;
+
+    function setup() {
+      createCanvas(1080, 1080 * 9 / 16).parent(document.body);
+      imageMode(CENTER);
+
+      document.getElementById('strength').oninput = e => waveStrength = +e.target.value;
+      document.getElementById('speed').oninput = e => waveSpeed = +e.target.value;
+      document.getElementById('scale').oninput = e => waveScale = +e.target.value;
+
+      document.getElementById('staticUpload').onchange = e => loadImageFromFile(e.target.files[0], img => imgStatic = img);
+      document.getElementById('waveUpload').onchange = e => loadImageFromFile(e.target.files[0], img => imgWave = img);
+    }
+
+    function loadImageFromFile(file, callback) {
+      const reader = new FileReader();
+      reader.onload = e => loadImage(e.target.result, callback);
+      reader.readAsDataURL(file);
+    }
+
+    function draw() {
+      background(255);
+
+      let centerX = width / 2;
+      let centerY = height / 2;
+
+      if (imgStatic) image(imgStatic, centerX, centerY, imgStatic.width, imgStatic.height);
+
+      if (imgWave) {
+        let imgX = centerX - imgWave.width / 2;
+        let imgY = centerY - imgWave.height / 2;
+
+        for (let y = 0; y < imgWave.height; y += 2) {
+          let waveOffset = sin(y * waveScale + frameCount * waveSpeed) * waveStrength;
+          let destX = imgX + waveOffset;
+
+          copy(imgWave, 0, y, imgWave.width, 2, destX, imgY + y, imgWave.width, 2);
+        }
+      }
+
+      if (recording && capturer) {
+        capturer.capture(canvas);
+        frameCountForCapture++;
+        if (frameCountForCapture >= recordFrames) stopRecording();
+      }
+    }
+
+    function startRecording() {
+      capturer = new CCapture({ format: 'webm', framerate: 30, name: 'wave_post' });
+      recording = true;
+      frameCountForCapture = 0;
+      capturer.start();
+    }
+
+    function stopRecording() {
+      recording = false;
+      capturer.stop();
+      capturer.save();
+    }
+  </script>
+
+</body>
+</html>
